@@ -2,9 +2,9 @@
  * Created by 10388 on 2017/10/30.
  */
 function initMap() {
-    var map = new AMap.Map('container',{
-        pitch:75,
-        viewMode:'3D',
+    var map = new AMap.Map('container', {
+        pitch: 75,
+        viewMode: '3D',
         resizeEnable: true,
         zoom: 10,
         center: [116.480983, 40.0958],
@@ -12,36 +12,55 @@ function initMap() {
     });
 
     var markers = [];
+    var shownMarkers = [];
 
-    function addMarkers (data) {
+    // for (var i in locations) {
+    //     setWeather(locations[i])
+    // }
+
+    (function addMarkers(locations) {
         markers = [];
-        for (var i = 0; i < data.length; i++) {
-            markers.push(new Marker(data[i]));
+
+        for (var i = 0; i < locations.length; i++) {
+            markers.push(new Marker(locations[i]));
+            shownMarkers.push(new Marker(locations[i]));
         }
         map.add(markers);
-    }
+    })(locations);
 
-    addMarkers(locations);
+    // 根据给定的索引数组设置marker集合的可见性
+    function renewMarkers(arr) {
+        shownMarkers = [];
+        for (var i in markers) {
+            markers[i].hide()
+        }
+        for (var i in arr) {
+            markers[arr[i]].show()
+            shownMarkers.push(markers[arr[i]])
+        }
+    }
 
     // 注册监听事件
     viewModel.searchKey.subscribe(function (newValue) {
         /* do stuff */
         var arr = [];
+        var tempLoactions = []
         for (var i = 0; i < locations.length; i++) {
             if (locations[i].name.search(newValue) !== -1) {
-                arr.push(locations[i])
+                arr.push(i)
+                tempLoactions.push(locations[i])
             }
         }
-        viewModel.searchedLocations(arr);
+        viewModel.searchedLocations(tempLoactions);
         viewModel.ifNone(arr.length === 0);
 
-        map.remove(markers);
-        addMarkers(arr);
+        renewMarkers(arr)
     });
 
     // 为单项绑定监听事件
-    viewModel.selectMarker = function (e) {
-      map.setCenter(new AMap.LngLat(e.position[0], e.position[1]));
+    viewModel.selectMarker = function ($index, data) {
+        map.setCenter(new AMap.LngLat(data.position[0], data.position[1]));
+        AMap.event.trigger(shownMarkers[$index()], 'click')
     };
 
     function Marker(location) {
@@ -53,24 +72,27 @@ function initMap() {
             title: location.name
         });
 
-        marker.infoWindow = new AMap.InfoWindow({
-            content: '<strong>'+ location.name +'</strong><p class="my-desc">'+ location.desc +'</p>',
-            //基点指向marker的头部位置
-            offset: new AMap.Pixel(0, -31)
+        setWeather(location, function () {
+            marker.infoWindow = new AMap.InfoWindow({
+                content: '<strong>' + location.name + '</strong><p class="my-desc">' + location.desc + '</p><p>'+ location.weather.weather +'</p>',
+                //基点指向marker的头部位置
+                offset: new AMap.Pixel(0, -31)
+            });
         });
 
-        //marker 点击时打开
-        AMap.event.addListener(marker, 'click', function() {
+        marker.on('click', function () {
             marker.infoWindow.open(map, marker.getPosition());
         });
         return marker
     }
 
     //为地图注册click事件获取鼠标点击出的经纬度坐标
-    var clickEventListener = map.on('click', function(e) {
+    var clickEventListener = map.on('click', function (e) {
         viewModel.lng(e.lnglat.getLng());
         viewModel.lat(e.lnglat.getLat());
+        regeocoder([e.lnglat.getLng(), e.lnglat.getLat()])
         // document.getElementById("lnglat").value = e.lnglat.getLng() + ',' + e.lnglat.getLat()
+
     });
     var auto = new AMap.Autocomplete({
         input: "tipinput"
@@ -81,5 +103,28 @@ function initMap() {
             map.setZoom(15);
             map.setCenter(e.poi.location);
         }
+    }
+
+    function regeocoder(lnglatXY) {  //逆地理编码
+        var geocoder = new AMap.Geocoder({
+            radius: 1000,
+            extensions: "all"
+        });
+        geocoder.getAddress(lnglatXY, function (status, result) {
+            if (status === 'complete' && result.info === 'OK') {
+                geocoder_CallBack(result);
+            }
+        });
+        // var marker = new AMap.Marker({  //加点
+        //     map: map,
+        //     position: lnglatXY
+        // });
+        // map.setFitView();
+    }
+
+    function geocoder_CallBack(data) {
+        var address = data.regeocode.formattedAddress; //返回地址描述
+        viewModel.address(address)
+        // document.getElementById("result").innerHTML = address;
     }
 }

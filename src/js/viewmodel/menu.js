@@ -7,8 +7,9 @@ var viewModel = {
     searchKey: ko.observable(null),
     lng: ko.observable(0),
     lat: ko.observable(0),
-    selectMarker: function (e) {
-        alert(e.name);
+    address: ko.observable(null),
+    selectMarker: function (index, data) {
+        alert(data.name);
     }
 };
 
